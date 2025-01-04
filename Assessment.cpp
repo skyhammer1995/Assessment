@@ -4,6 +4,32 @@
 #include <fstream>
 #include <sstream>
 #include <memory>
+#include <atomic>
+#include <thread>
+#include <chrono>
+
+/* thread stuff, after submission */
+std::atomic<bool> returnPressed {false};
+std::atomic<bool> errorRow{false};
+std::atomic<bool> breakOut{false};
+
+void checkInput() {
+    while (true) {
+        if (breakOut) {
+            break;
+        }
+
+        if (std::cin.get() == '\n' && !errorRow) {
+            returnPressed = true;
+            if (returnPressed) {
+                std::cout << "Return pressed, printing layer to filesystem" << std::endl;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // block the thread from hogging CPU usage
+    }
+}
+
+/* thread stuff, after submission */
 
 FakePrinter::FakePrinter(const std::string& printName,
                          const std::string& outputPath,
@@ -91,9 +117,11 @@ void FakePrinter::handleSupervisedPrint() {
         return;
     }
 
+    std::thread inputThread(checkInput);
+
     // by row
     for (const auto& row : m_csvData) {
-        // by element 
+        // by element
         for (size_t i = 0; i < row.size(); ++i) {
             outfile << row[i];
             if (i <= row.size() - 1) {
@@ -102,14 +130,32 @@ void FakePrinter::handleSupervisedPrint() {
         }
         outfile << "\n";
 
+        if (returnPressed) {
+            std::string singleLayerFile = "\\singleLayer.csv";
+            std::ofstream outfile2(m_outputPath + singleLayerFile);
+            if (!outfile2.is_open()) {
+                std::cout << "Error: opening singleLayer file!" << std::endl;
+            } else {
+                for (size_t i = 0; i < row.size(); ++i) {
+                    outfile2 << row[i];
+                    if (i <= row.size() - 1) {
+                        outfile2 << ",";
+                    }
+                }
+                outfile2 << "\n";
+            }
+            returnPressed = false; // continue with the other output stream
+        }
+
         // handle error case
         auto it = find_if(row.begin(), row.end(), [](const std::string& layerError) {
             return layerError.find("T") == 0; // find error starting with "T"
         });
 
         if (it != row.end()) {
+            errorRow = true;
             std::cout << "Error: " << *it << std::endl;
-            std::cout << "Would you like to end print? y/n" << std::endl;
+            std::cout << "Would you like to end print? y/N" << std::endl;
             std::string endPrint;
             getline(std::cin, endPrint);
 
@@ -117,8 +163,12 @@ void FakePrinter::handleSupervisedPrint() {
                 std::cout << "Ending print..." << std::endl;
                 break;
             }
+            errorRow = false;
         } 
     }
+    
+    breakOut = true;
+    inputThread.join();
     outfile.close();
 }
 
@@ -153,6 +203,7 @@ int main() {
     // once data is taken in, I want to call a print function, and then in that we can check for which mode
     // to determine our behavior and if we need to handle the keystroke input or not, etc.
     pFakePrinter->print();
+
 
     return 0;
 }
