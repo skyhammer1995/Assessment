@@ -56,7 +56,7 @@ void FakePrinter::print() {
 
 void FakePrinter::handleAutomaticPrint() {
     // no need to check for csv data, already handled in `print()`
-    std::string filename = "output.csv";
+    std::string filename = "\\output.csv";
     std::string fullpath = m_outputPath + filename;
     
     std::ofstream outfile(fullpath);
@@ -71,17 +71,19 @@ void FakePrinter::handleAutomaticPrint() {
         // by element 
         for (size_t i = 0; i < row.size(); ++i) {
             outfile << row[i];
+            if (i <= row.size() - 1) {
+                outfile << ",";
         }
-        // I'm not sure with the time left if I need to handle \n or not, if I get time to test, will update
+        }
+        outfile << "\n";
     }
     outfile.close();
 }
 
 void FakePrinter::handleSupervisedPrint() {
     // no need to check for csv data, already handled in `print()`
-    std::string filename = "output.csv";
+    std::string filename = "\\output.csv";
     std::string fullpath = m_outputPath + filename;
-    std::string currentError = "SUCCESS";
     std::ofstream outfile(fullpath);
 
     if (!outfile.is_open()) {
@@ -94,9 +96,14 @@ void FakePrinter::handleSupervisedPrint() {
         // by element 
         for (size_t i = 0; i < row.size(); ++i) {
             outfile << row[i];
+            if (i <= row.size() - 1) {
+                outfile << ",";
+            }
         }
+        outfile << "\n";
+
         // handle error case
-        auto it = find_if(row.begin(), row.end(),[](const std::string& layerError) {
+        auto it = find_if(row.begin(), row.end(), [](const std::string& layerError) {
             return layerError.find("T") == 0; // find error starting with "T"
         });
 
@@ -112,7 +119,6 @@ void FakePrinter::handleSupervisedPrint() {
             }
         } 
     }
-
     outfile.close();
 }
 
